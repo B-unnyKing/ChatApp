@@ -165,8 +165,20 @@ function ensureRoomMember(roomId, username) {
   );
 
   if (!alreadyMember) {
-    memberSheet.appendRow([roomId, username, Date.now()]);
-  }
+  memberSheet.appendRow([
+    roomId,
+    username,
+    Date.now()
+  ]);
+
+  CacheService.getScriptCache().remove(
+    'room_member_' +
+    String(roomId) +
+    '_' +
+    String(username).toLowerCase()
+  );
+}
+
 }
 
 function getRoomById(roomId) {
