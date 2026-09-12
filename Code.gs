@@ -463,11 +463,99 @@ function getMessages(roomId, beforeCreatedAt, limit, sessionToken, sinceCreatedA
   const currentUser = requireSessionUser(sessionToken);
 
   if (!room || !isRoomMember(room, currentUser)) {
-    return { messages: [], hasMoreOlder: false };
+    return {
+      messages: [],
+      hasMoreOlder: false
+    };
   }
 
-  const pageSize = Math.max(1, Number(limit) || 7);
-  const rows = sheet_('Messages', ['Id', 'RoomId', 'Username', 'Message', 'Image', 'CreatedAt', 'MessageType'])
+  const pageSize = Math.max(1, Math.min(Number(limit) || 7, 50));
+
+  const messageSheet = sheet_(
+    'Messages',
+    ['Id', 'RoomId', 'Username', 'Message', 'Image', 'CreatedAt', 'MessageType']
+  );
+
+  const lastRow = messageSheet.getLastRow();
+
+  if (lastRow <= 1) {
+    return {
+      messages: [],
+      hasMoreOlder: false
+    };
+  }
+
+  /*
+   * IMPORTANT:
+   * For polling, only inspect the newest rows.
+   *
+   * Messages are appended chronologically, so we can walk backward
+   * from the bottom instead of processing the entire sheet.
+   */
+  if (
+    sinceCreatedAt !== undefined &&
+    sinceCreatedAt !== null &&
+    sinceCreatedAt !== ''
+  ) {
+    const since = Number(sinceCreatedAt) || 0;
+
+    const firstDataRow = Math.max(2, lastRow - 500 + 1);
+    const rowCount = lastRow - firstDataRow + 1;
+
+    const rows = messageSheet
+      .getRange(firstDataRow, 1, rowCount, 7)
+      .getValues();
+
+    const messages = [];
+
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+
+      const createdAt = Number(row[5] || 0);
+
+      /*
+       * Use >= rather than >.
+       *
+       * This prevents two messages created during the same
+       * millisecond from causing one to disappear.
+       */
+      if (createdAt < since) {
+        break;
+      }
+
+      if (String(row[1]) !== room) {
+        continue;
+      }
+
+      messages.push({
+        id: String(row[0]),
+        roomId: String(row[1]),
+        username: String(row[2]),
+        text: String(row[3] || ''),
+        image: String(row[4] || ''),
+        createdAt: createdAt,
+        type: String(row[6] || (row[4] ? 'image' : 'text'))
+      });
+
+      if (messages.length >= 50) {
+        break;
+      }
+    }
+
+    messages.reverse();
+
+    return {
+      messages: messages,
+      hasMoreOlder: false
+    };
+  }
+
+  /*
+   * Initial load / older messages.
+   *
+   * These requests are less frequent, so we can read the sheet normally.
+   */
+  const rows = messageSheet
     .getDataRange()
     .getValues()
     .slice(1);
@@ -483,20 +571,24 @@ function getMessages(roomId, beforeCreatedAt, limit, sessionToken, sinceCreatedA
       createdAt: Number(row[5] || 0),
       type: String(row[6] || (row[4] ? 'image' : 'text'))
     }))
-    .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+    .sort((a, b) =>
+      Number(a.createdAt || 0) -
+      Number(b.createdAt || 0)
+    );
 
-  if (sinceCreatedAt !== undefined && sinceCreatedAt !== null && sinceCreatedAt !== '') {
-    const newestAfter = messages.filter(msg => Number(msg.createdAt || 0) > Number(sinceCreatedAt || 0));
-    return {
-      messages: newestAfter.slice(-200),
-      hasMoreOlder: false
-    };
-  }
+  if (
+    beforeCreatedAt !== undefined &&
+    beforeCreatedAt !== null &&
+    beforeCreatedAt !== ''
+  ) {
+    const beforeValue = Number(beforeCreatedAt) || 0;
 
-  if (beforeCreatedAt !== undefined && beforeCreatedAt !== null && beforeCreatedAt !== '') {
-    const beforeValue = Number(beforeCreatedAt || 0);
-    const olderMessages = messages.filter(msg => Number(msg.createdAt || 0) < beforeValue);
+    const olderMessages = messages.filter(
+      msg => Number(msg.createdAt || 0) < beforeValue
+    );
+
     const page = olderMessages.slice(-pageSize);
+
     return {
       messages: page,
       hasMoreOlder: olderMessages.length > page.length
@@ -504,6 +596,7 @@ function getMessages(roomId, beforeCreatedAt, limit, sessionToken, sinceCreatedA
   }
 
   const latestPage = messages.slice(-pageSize);
+
   return {
     messages: latestPage,
     hasMoreOlder: messages.length > latestPage.length
