@@ -725,30 +725,53 @@ function updateOlderButtonVisibility() {
   $('#loadOlderButton').toggleClass('hidden', !shouldShow);
 }
 
-function scheduleNextMessagePoll() {
+function scheduleNextMessagePoll(delay = 4000) {
   stopMessagePolling();
 
   if (!state.roomId || !state.sessionToken) {
     return;
   }
 
-  const roomKey = String(state.roomId);
-  const roomMessages = state.roomMessages[roomKey] || [];
-  const newestCreatedAt = getNewestCreatedAt(roomMessages);
-
   state.messageRefreshTimer = setTimeout(() => {
     state.messageRefreshTimer = null;
-    if (!state.roomId || !state.sessionToken || state.loadingMessages) {
+
+    if (!state.roomId || !state.sessionToken) {
       return;
     }
+
+    /*
+     * If another request is currently running, don't stop polling.
+     * Just try again shortly.
+     */
+    if (state.loadingMessages) {
+      scheduleNextMessagePoll(1000);
+      return;
+    }
+
+    const roomKey = String(state.roomId);
+    const roomMessages = state.roomMessages[roomKey] || [];
+
+    const newestCreatedAt = getNewestCreatedAt(roomMessages);
+
     requestMessages({
-      sinceCreatedAt: newestCreatedAt,
-      limit: 200,
+      /*
+       * Subtract 1ms so that messages with the exact same
+       * createdAt timestamp are not missed.
+       *
+       * dedupeMessages() removes anything we already have.
+       */
+      sinceCreatedAt: Math.max(0, newestCreatedAt - 1),
+
+      limit: 50,
+
       showLoading: false,
+
       isRefresh: true
     });
-  }, 2500);
+
+  }, delay);
 }
+
 
 function clearSessionState() {
   state.username = '';
