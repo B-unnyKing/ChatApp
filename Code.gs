@@ -114,14 +114,46 @@ function normalizeImageBase64(imageData) {
 function isRoomMember(roomId, username) {
   if (!roomId || !username) return false;
 
-  const memberSheet = sheet_('RoomMembers', ['RoomId', 'Username', 'JoinedAt']);
-  const rows = memberSheet.getDataRange().getValues().slice(1);
+  const cache = CacheService.getScriptCache();
 
-  return rows.some(row =>
-    String(row[0]) === String(roomId) &&
-    String(row[1]).toLowerCase() === String(username).toLowerCase()
+  const key =
+    'room_member_' +
+    String(roomId) +
+    '_' +
+    String(username).toLowerCase();
+
+  const cached = cache.get(key);
+
+  if (cached !== null) {
+    return cached === '1';
+  }
+
+  const memberSheet = sheet_(
+    'RoomMembers',
+    ['RoomId', 'Username', 'JoinedAt']
   );
+
+  const rows = memberSheet
+    .getDataRange()
+    .getValues()
+    .slice(1);
+
+  const result = rows.some(row =>
+    String(row[0]) === String(roomId) &&
+    String(row[1]).toLowerCase() ===
+      String(username).toLowerCase()
+  );
+
+  cache.put(
+    key,
+    result ? '1' : '0',
+    300
+  );
+
+  return result;
 }
+
+
 
 function ensureRoomMember(roomId, username) {
   if (!roomId || !username) return;
