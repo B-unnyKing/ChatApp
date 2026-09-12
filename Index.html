@@ -1046,14 +1046,27 @@ function requestMessages(options = {}) {
       setChatLoading(false);
     }
     scheduleNextMessagePoll();
-  })..withFailureHandler(() => {
+  })}).withFailureHandler(() => {
   if (roomId === state.roomId) {
     state.loadingMessages = false;
+
     if (showLoading) {
       setChatLoading(false);
     }
+
+    /*
+     * Don't let one failed request permanently kill polling.
+     */
+    scheduleNextMessagePoll(2000);
   }
-}).getMessages(roomId, beforeCreatedAt, limit, state.sessionToken, sinceCreatedAt);
+}).getMessages(
+  roomId,
+  beforeCreatedAt,
+  limit,
+  state.sessionToken,
+  sinceCreatedAt
+);
+
 }
 
 $('#rooms').on('change', function() {
