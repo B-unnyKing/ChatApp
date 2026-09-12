@@ -1046,14 +1046,14 @@ function requestMessages(options = {}) {
       setChatLoading(false);
     }
     scheduleNextMessagePoll();
-  }).withFailureHandler(() => {
-    if (roomId === state.roomId) {
-      state.loadingMessages = false;
-      if (showLoading) {
-        setChatLoading(false);
-      }
+  })..withFailureHandler(() => {
+  if (roomId === state.roomId) {
+    state.loadingMessages = false;
+    if (showLoading) {
+      setChatLoading(false);
     }
-  }).getMessages(roomId, beforeCreatedAt, limit, state.sessionToken, sinceCreatedAt);
+  }
+}).getMessages(roomId, beforeCreatedAt, limit, state.sessionToken, sinceCreatedAt);
 }
 
 $('#rooms').on('change', function() {
