@@ -1170,7 +1170,8 @@ $('#input').on('submit', function(event) {
 
   setSubmitLoading(true);
 
-  google.script.run.withSuccessHandler((savedMessage) => {
+  google.script.run
+  .withSuccessHandler((savedMessage) => {
     if (savedMessage && savedMessage.id) {
       appendMessage(savedMessage, state.roomId);
     }
@@ -1180,7 +1181,29 @@ $('#input').on('submit', function(event) {
     $('#imageUpload').val('');
     $('#text').attr('placeholder', 'Message...');
     setSubmitLoading(false);
-  }).saveMessage(state.roomId, text, state.pendingImage, state.sessionToken);
+
+    /*
+     * Immediately schedule polling after sending.
+     * This helps keep the client synchronized.
+     */
+    scheduleNextMessagePoll(4000);
+  })
+  .withFailureHandler((error) => {
+    console.error('Message failed:', error);
+
+    setSubmitLoading(false);
+    $('#text').attr(
+      'placeholder',
+      'Message failed to send.'
+    );
+  })
+  .saveMessage(
+    state.roomId,
+    text,
+    state.pendingImage,
+    state.sessionToken
+  );
+
 
   google.script.run.withFailureHandler(() => {
     setSubmitLoading(false);
