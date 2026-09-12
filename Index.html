@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --border: #e0e3e7;
+      --primary: #5865f2;
+      --primary-dark: #3d4ae0;
+      --primary-light: #e7ebff;
+      --secondary: #dbeafe;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --danger: #dc2626;
+      --danger-dark: #b91c1c;
+      --success: #16a34a;
+      --success-dark: #15803d;
+      --shadow: rgba(88, 101, 242, 0.18);
+    }
+
+    body[data-theme="dark"] {
+      --bg: #111827;
+      --panel: #1f2937;
+      --border: #374151;
+      --primary: #8b5cf6;
+      --primary-dark: #7c3aed;
+      --primary-light: #312e81;
+      --secondary: #1e293b;
+      --text: #f3f4f6;
+      --muted: #cbd5e1;
+      --danger: #f87171;
+      --danger-dark: #dc2626;
+      --success: #34d399;
+      --success-dark: #10b981;
+      --shadow: rgba(139, 92, 246, 0.25);
+    }
+
+    body[data-theme="purple"] {
+      --bg: #f5f3ff;
+      --panel: #ffffff;
+      --border: #ddd6fe;
+      --primary: #7c3aed;
+      --primary-dark: #6d28d9;
+      --primary-light: #f3e8ff;
+      --secondary: #ede9fe;
+      --text: #2e1065;
+      --muted: #6d28d9;
+      --danger: #ef4444;
+      --danger-dark: #b91c1c;
+      --success: #10b981;
+      --success-dark: #059669;
+      --shadow: rgba(124, 58, 237, 0.18);
+    }
+    * { box-sizing: border-box; }
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148, 163, 184, 0.7) transparent;
+    }
+    *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    *::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.7);
+      border-radius: 10px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+    html, body {
+      margin: 0;
+      font-family: system-ui;
+      background: var(--bg);
+      color: var(--text);
+      height: 100%;
+    }
+    body {
+      min-height: 100vh;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    button, input, select {
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    button:active {
+      transform: translateY(0);
+      filter: brightness(0.96);
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.5);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 rgba(88, 101, 242, 0.15); }
+      50% { box-shadow: 0 0 18px rgba(88, 101, 242, 0.22); }
+      100% { box-shadow: 0 0 0 rgba(88, 101, 242, 0.15); }
+    }
+
+    .is-loading {
+      pointer-events: none;
+      animation: pulseGlow 1.4s infinite;
+      opacity: 0.9;
+    }
+
+    #authPage {
+      margin: auto;
+      width: min(820px, 90vw);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .authGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 24px;
+      width: 100%;
+    }
+
+    .authCard {
+      background: var(--panel);
+      padding: 28px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    }
+
+    .authCard h2 { margin: 0 0 18px; }
+    .authCard input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .authCard button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 8px 20px var(--shadow);
+    }
+    .authCard button:hover {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    }
+    .authMsg {
+      font-size: 13px;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+    .authMsg.error { color: var(--danger); }
+    .authMsg.success { color: var(--success); }
+
+    #app {
+      display: none;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    #sidebar {
+      width: 280px;
+      min-width: 280px;
+      max-height: 100vh;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 8px 0 30px rgba(15, 23, 42, 0.04);
+      overflow: hidden;
+    }
+    #sidebar header { padding: 18px 16px; font-weight: 700; border-bottom: 1px solid var(--border); }
+    #userBadge { padding: 10px 16px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--border); }
+    .sideSection {
+      padding: 10px 10px 0;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .sectionHeader {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0 6px;
+    }
+    #rooms {
+      flex: 1;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent);
+      min-height: 180px;
+      height: 100%;
+    }
+    .peopleList {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 0 4px 8px;
+    }
+    .personItem {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(148, 163, 184, 0.08);
+      border: 1px solid transparent;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .personDot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 12px rgba(52, 211, 153, 0.75);
+    }
+    #sidebar button {
+      margin: 6px 10px;
+      padding: 8px 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(88, 101, 242, 0.18);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    #sidebar button.secondary {
+      background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+      color: var(--text);
+      box-shadow: 0 8px 16px rgba(59, 130, 246, 0.1);
+    }
+    #sidebar button.danger {
+      background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+      box-shadow: 0 10px 18px rgba(220, 38, 38, 0.18);
+    }
+
+    .themeControls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding: 8px 10px 4px;
+    }
+
+    .themeBtn {
+      padding: 7px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .themeBtn.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-color: var(--primary);
+      color: white;
+    }
+
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    #topbar { padding: 16px 18px; border-bottom: 1px solid var(--border); background: var(--panel); font-weight: 700; }
+    #chatToolbar {
+      padding: 8px 16px 0;
+      background: transparent;
+    }
+    .loadOlderButton {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 999px;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .loadOlderButton.hidden {
+      display: none;
+    }
+    #chat {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      background: linear-gradient(180deg, rgba(148,163,184,0.08), rgba(148,163,184,0.02));
+      overscroll-behavior: contain;
+    }
+    .msg { margin-bottom: 14px; max-width: 72%; }
+    .msg.me { margin-left: auto; text-align: right; }
+    .user { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--muted); }
+    .bubble { display: inline-block; padding: 10px 14px; border-radius: 14px; background: rgba(255,255,255,0.7); border: 1px solid var(--border); box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06); }
+    .msg.me .bubble { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border-color: var(--primary); }
+    .msg .text { white-space: pre-wrap; word-break: break-word; }
+    .msg img { max-width: 220px; max-height: 220px; border-radius: 10px; margin-top: 8px; display: block; }
+    .msg.me img { margin-left: auto; }
+
+    #input {
+      display: flex;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+      gap: 8px;
+      align-items: center;
+      box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.04);
+    }
+    #text {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.85);
+      color: var(--text);
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    #input button {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border: none;
+      color: white;
+      padding: 0 18px;
+      border-radius: 10px;
+      height: 42px;
+      min-width: 90px;
+      box-shadow: 0 8px 18px rgba(88, 101, 242, 0.18);
+    }
+    .file-wrap { position: relative; display: flex; align-items: center; }
+    .file-wrap label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text);
+    }
+    .file-wrap label:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(88, 101, 242, 0.12);
+    }
+    #imageUpload { display: none; }
+
+    .loadingOverlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.24);
+      backdrop-filter: blur(4px);
+      z-index: 20;
+    }
+    .loadingOverlay.hidden { display: none; }
+    .loadingCard {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.85);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 28px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+      text-align: center;
+    }
+    .settingsPanel {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: min(320px, calc(100% - 30px));
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 30px 60px rgba(15, 23, 42, 0.18);
+      padding: 18px;
+      display: none;
+      z-index: 40;
+    }
+    .settingsPanel.open {
+      display: block;
+    }
+    .settingsHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      font-weight: 700;
+    }
+    .settingsBody {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      color: var(--text);
+    }
+    .settingRow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 10px;
+      background: rgba(148, 163, 184, 0.06);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 28px;
+      display: inline-block;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #cbd5e1;
+      border-radius: 999px;
+      transition: 0.2s ease;
+      cursor: pointer;
+    }
+    .slider:before {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 4px;
+      top: 4px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s ease;
+    }
+    .switch input:checked + .slider {
+      background: var(--primary);
+    }
+    .switch input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+    .settingsActions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .settingsActions button {
+      padding: 9px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .settingsActions button.primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-color: var(--primary);
+      color: white;
+    }
+    .loaderRing {
+      width: 42px;
+      height: 42px;
+      border: 4px solid rgba(88, 101, 242, 0.18);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    .loadingTitle {
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .loadingSub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<div id="authPage">
+  <div class="authGrid">
+    <div class="authCard">
+      <h2>Login</h2>
+      <form id="loginForm">
+        <input id="loginUser" name="loginUser" placeholder="Username">
+        <input id="loginPass" name="loginPass" type="password" placeholder="Password">
+        <button type="submit">Login</button>
+      </form>
+      <div id="loginErr" class="authMsg error"></div>
+    </div>
+
+    <div class="authCard">
+      <h2>Create account</h2>
+      <form id="signupForm">
+        <input id="signupUser" name="signupUser" placeholder="Username">
+        <input id="signupPass" name="signupPass" type="password" placeholder="Password">
+        <input id="signupPassConfirm" name="signupPassConfirm" type="password" placeholder="Confirm password">
+        <button type="submit">Create account</button>
+      </form>
+      <div id="signupErr" class="authMsg error"></div>
+      <div id="signupSuccess" class="authMsg success"></div>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <header>💬 Chat</header>
+    <div id="userBadge">Signed in as <strong id="userNameLabel"></strong></div>
+
+    <div class="sideSection">
+      <div class="sectionHeader">Spaces</div>
+      <select id="rooms" size="10"></select>
+    </div>
+
+    <div class="sideSection">
+      <div class="sectionHeader">Accounts</div>
+      <div id="peopleList" class="peopleList"></div>
+    </div>
+
+    <button id="newRoom">+ Public Room</button>
+    <button id="newPrivateRoom" class="secondary">+ Private Room</button>
+    <button id="newDM" class="secondary">+ Direct Message</button>
+    <button id="invite" class="secondary">Invite User</button>
+    <button id="toggleSettings" class="secondary">Settings</button>
+    <button id="deleteRoom" class="danger" style="display:none;">Delete Space</button>
+    <button id="refreshMessages" class="secondary">Refresh</button>
+    <div class="themeControls">
+      <button type="button" class="themeBtn active" data-theme="light">Light</button>
+      <button type="button" class="themeBtn" data-theme="dark">Dark</button>
+      <button type="button" class="themeBtn" data-theme="purple">Purple</button>
+    </div>
+    <button id="logout" class="danger">Logout</button>
+  </div>
+
+  <div id="main" style="position: relative;">
+    <div id="settingsPanel" class="settingsPanel">
+      <div class="settingsHeader">
+        <span>Settings</span>
+        <button id="closeSettings" type="button" aria-label="Close settings">✕</button>
+      </div>
+      <div class="settingsBody">
+        <div class="settingRow">
+          <span>Visible to others</span>
+          <label class="switch" for="visibilityToggle">
+            <input id="visibilityToggle" type="checkbox">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="settingsActions">
+          <button type="button" id="cancelSettings">Close</button>
+          <button type="button" id="saveSettings" class="primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="topbar">No Room</div>
+    <div id="chatToolbar">
+      <button type="button" id="loadOlderButton" class="loadOlderButton hidden">See more</button>
+    </div>
+    <div id="chat"></div>
+    <div id="chatLoadingOverlay" class="loadingOverlay hidden">
+      <div class="loadingCard">
+        <div class="loaderRing"></div>
+        <div id="chatLoadingTitle" class="loadingTitle">Loading messages...</div>
+        <div id="chatLoadingSub" class="loadingSub">Connecting to space</div>
+      </div>
+    </div>
+
+    <form id="input">
+      <div class="file-wrap">
+        <label for="imageUpload">📎</label>
+        <input type="file" id="imageUpload" accept="image/*">
+      </div>
+      <input id="text" placeholder="Message..." autocomplete="off">
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const state = {
+  username: '',
+  sessionToken: localStorage.getItem('chatSessionToken') || '',
+  roomId: null,
+  rooms: [],
+  roomMessages: {},
+  roomMeta: {},
+  loadingMessages: false,
+  pendingImage: '',
+  theme: localStorage.getItem('chatTheme') || 'light',
+  messageRefreshTimer: null,
+  pageSize: 7
+};
+
+function setChatLoading(isLoading, title, subText) {
+  const $overlay = $('#chatLoadingOverlay');
+  const $title = $('#chatLoadingTitle');
+  const $sub = $('#chatLoadingSub');
+
+  if (isLoading) {
+    $title.text(title || 'Loading messages...');
+    $sub.text(subText || 'Connecting to space');
+    $overlay.removeClass('hidden');
+    return;
+  }
+
+  $overlay.addClass('hidden');
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, function(ch) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+  });
+}
+
+function clearAuthErrors() {
+  $('#loginErr').text('');
+  $('#signupErr').text('');
+  $('#signupSuccess').text('');
+}
+
+function showLogin() {
+  $('#authPage').show();
+  $('#app').hide();
+}
+
+function showApp() {
+  $('#authPage').hide();
+  $('#app').show();
+  $('#userNameLabel').text(state.username);
+  init();
+}
+
+function stopMessagePolling() {
+  if (state.messageRefreshTimer) {
+    clearTimeout(state.messageRefreshTimer);
+    state.messageRefreshTimer = null;
+  }
+}
+
+function getNewestCreatedAt(messages) {
+  if (!Array.isArray(messages) || !messages.length) return 0;
+  return messages.reduce((max, msg) => Math.max(max, Number(msg && msg.createdAt ? msg.createdAt : 0)), 0);
+}
+
+function getOldestCreatedAt(messages) {
+  if (!Array.isArray(messages) || !messages.length) return 0;
+  return messages.reduce((min, msg) => {
+    const createdAt = Number(msg && msg.createdAt ? msg.createdAt : 0);
+    return min === 0 ? createdAt : Math.min(min, createdAt);
+  }, 0);
+}
+
+function dedupeMessages(messages) {
+  const merged = {};
+  (Array.isArray(messages) ? messages : []).forEach(msg => {
+    if (!msg || !msg.id) return;
+    merged[String(msg.id)] = msg;
+  });
+
+  return Object.keys(merged)
+    .map(key => merged[key])
+    .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+}
+
+function updateOlderButtonVisibility() {
+  const roomKey = state.roomId ? String(state.roomId) : '';
+  const meta = roomKey ? (state.roomMeta[roomKey] || {}) : {};
+  const shouldShow = !!roomKey && !!meta.hasMoreOlder && !state.loadingMessages;
+  $('#loadOlderButton').toggleClass('hidden', !shouldShow);
+}
+
+function scheduleNextMessagePoll() {
+  stopMessagePolling();
+
+  if (!state.roomId || !state.sessionToken) {
+    return;
+  }
+
+  const roomKey = String(state.roomId);
+  const roomMessages = state.roomMessages[roomKey] || [];
+  const newestCreatedAt = getNewestCreatedAt(roomMessages);
+
+  state.messageRefreshTimer = setTimeout(() => {
+    state.messageRefreshTimer = null;
+    if (!state.roomId || !state.sessionToken || state.loadingMessages) {
+      return;
+    }
+    requestMessages({
+      sinceCreatedAt: newestCreatedAt,
+      limit: 200,
+      showLoading: false,
+      isRefresh: true
+    });
+  }, 2500);
+}
+
+function clearSessionState() {
+  state.username = '';
+  state.sessionToken = '';
+  state.roomId = null;
+  state.rooms = [];
+  state.roomMessages = {};
+  state.roomMeta = {};
+  stopMessagePolling();
+  localStorage.removeItem('chatSessionToken');
+}
+
+function toggleSettingsPanel(forceOpen) {
+  const $panel = $('#settingsPanel');
+  const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !$panel.hasClass('open');
+  $panel.toggleClass('open', shouldOpen);
+}
+
+function updateRoomHeader() {
+  const room = state.rooms.find(r => r.id === state.roomId) || null;
+  $('#topbar').text(room ? room.name : 'No Room');
+  const canDelete = !!room && (String(room.owner || '').toLowerCase() === String(state.username).toLowerCase() || room.type === 'dm');
+  $('#deleteRoom').toggle(canDelete);
+}
+
+function renderMessagesForRoom(roomId, messages, preserveScrollPosition = false) {
+  const roomKey = String(roomId || '');
+  if (!roomKey) return;
+
+  const roomMessages = dedupeMessages(Array.isArray(messages) ? messages : []);
+  state.roomMessages[roomKey] = roomMessages;
+  const $chat = $('#chat');
+  const chatEl = $chat[0];
+  const previousScrollHeight = chatEl ? chatEl.scrollHeight : 0;
+  const previousScrollTop = chatEl ? chatEl.scrollTop : 0;
+
+  const fragment = document.createDocumentFragment();
+  roomMessages.forEach(msg => {
+    if (!msg || !msg.id) return;
+
+    const $msg = $('<div class="msg"></div>');
+    if (msg.username === state.username) $msg.addClass('me');
+
+    const $user = $('<div class="user"></div>').text(msg.username || 'Unknown');
+    const $bubble = $('<div class="bubble"></div>');
+
+    if (msg.text) {
+      $bubble.append($('<div class="text"></div>').html(escapeHtml(msg.text).replace(/\n/g, '<br>')));
+    }
+
+    const rawImage = String(msg.image || '');
+    const imageMatch = rawImage.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+    const imageBase64 = imageMatch ? imageMatch[2] : rawImage;
+    if (imageBase64) {
+      $bubble.append($('<img>', {
+        src: `data:image/png;base64,${imageBase64}`,
+        alt: 'uploaded image'
+      }));
+    }
+
+    $msg.append($user, $bubble);
+    fragment.appendChild($msg[0]);
+  });
+
+  $chat.empty().append(fragment);
+
+  if (chatEl) {
+    if (preserveScrollPosition) {
+      const newScrollHeight = chatEl.scrollHeight;
+      chatEl.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
+    } else {
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+  }
+}
+
+function renderRoomList(rooms) {
+  const previousRoomId = state.roomId;
+  state.rooms = rooms || [];
+  $('#rooms').empty();
+
+  state.rooms.forEach(room => {
+    const label = room.private ? `🔒 ${room.name}` : room.type === 'dm' ? `DM ${room.name}` : room.name;
+    $('#rooms').append(`<option value="${room.id}">${escapeHtml(label)}</option>`);
+  });
+
+  if (!state.roomId || !state.rooms.some(room => room.id === state.roomId)) {
+    state.roomId = state.rooms[0] ? state.rooms[0].id : null;
+  }
+
+  if (state.roomId) {
+    $('#rooms').val(state.roomId);
+  }
+
+  if (previousRoomId !== state.roomId) {
+    $('#chat').empty();
+  }
+
+  updateRoomHeader();
+  if (state.roomId) {
+    requestMessages({ limit: state.pageSize, showLoading: true, isInitialLoad: true });
+  } else {
+    $('#loadOlderButton').addClass('hidden');
+  }
+}
+
+function appendMessage(msg, roomId = state.roomId) {
+  if (!roomId || !msg || !msg.id) return;
+
+  const roomKey = String(roomId);
+  const roomMessages = state.roomMessages[roomKey] || [];
+  const merged = dedupeMessages([...roomMessages, msg]);
+  state.roomMessages[roomKey] = merged;
+  const newest = getNewestCreatedAt(merged);
+  const oldest = getOldestCreatedAt(merged);
+  state.roomMeta[roomKey] = {
+    newestCreatedAt: newest,
+    oldestCreatedAt: oldest,
+    hasMoreOlder: false
+  };
+
+  renderMessagesForRoom(roomKey, merged);
+}
+
+function setSubmitLoading(isLoading) {
+  const $button = $('#input button[type="submit"]');
+  if (isLoading) {
+    $button.addClass('is-loading');
+    $button.html('<span class="loading-spinner"></span>Sending');
+  } else {
+    $button.removeClass('is-loading');
+    $button.html('Send');
+  }
+}
+
+function applyTheme(themeName) {
+  const theme = ['light', 'dark', 'purple'].includes(themeName) ? themeName : 'light';
+  state.theme = theme;
+  document.body.setAttribute('data-theme', theme);
+  localStorage.setItem('chatTheme', theme);
+
+  $('.themeBtn').removeClass('active');
+  $('.themeBtn[data-theme="' + theme + '"]').addClass('active');
+}
+
+function loadRooms() {
+  if (!state.sessionToken) return;
+
+  setChatLoading(true, 'Loading spaces...', 'Gathering your rooms');
+  google.script.run.withSuccessHandler((rooms) => {
+    renderRoomList(rooms);
+    setChatLoading(false);
+  }).getRooms(state.sessionToken);
+}
+
+function renderUsers(users) {
+  const list = users || [];
+  $('#peopleList').empty();
+
+  if (!list.length) {
+    $('#peopleList').append('<div class="personItem"><span class="personDot" style="background:#94a3b8; box-shadow:none"></span><span>No visible accounts</span></div>');
+    return;
+  }
+
+  list.forEach(user => {
+    const username = String(user && user.username ? user.username : '');
+    if (!username) return;
+
+    const display = $('<div class="personItem"></div>');
+    const dot = $('<span class="personDot"></span>');
+    const name = $('<span></span>').text(username);
+    display.append(dot, name);
+    $('#peopleList').append(display);
+  });
+}
+
+function loadUsers() {
+  if (!state.sessionToken) return;
+
+  google.script.run.withSuccessHandler((users) => {
+    renderUsers(users);
+  }).getUsers(state.sessionToken);
+}
+
+function loadUserVisibility() {
+  if (!state.sessionToken) return;
+
+  google.script.run.withSuccessHandler((result) => {
+    const visible = !!(result && result.visible !== false);
+    $('#visibilityToggle').prop('checked', visible);
+  }).getUserVisibility(state.sessionToken);
+}
+
+function saveUserVisibility() {
+  if (!state.sessionToken) return;
+
+  const visible = $('#visibilityToggle').is(':checked');
+  google.script.run.withSuccessHandler((result) => {
+    if (result && result.ok) {
+      toggleSettingsPanel(false);
+      loadUsers();
+    }
+  }).updateUserVisibility(visible, state.sessionToken);
+}
+
+function requestMessages(options = {}) {
+  const {
+    beforeCreatedAt = null,
+    sinceCreatedAt = null,
+    limit = state.pageSize,
+    showLoading = false,
+    isInitialLoad = false,
+    isOlderRequest = false,
+    isRefresh = false
+  } = options;
+
+  const roomId = state.roomId;
+  if (!roomId || !state.sessionToken || state.loadingMessages) return;
+
+  const roomKey = String(roomId);
+  const roomMessages = state.roomMessages[roomKey] || [];
+  const currentChat = $('#chat')[0];
+  const scrollBeforeRequest = currentChat ? currentChat.scrollTop : 0;
+  const scrollHeightBeforeRequest = currentChat ? currentChat.scrollHeight : 0;
+
+  state.loadingMessages = true;
+
+  if (showLoading) {
+    setChatLoading(true, isOlderRequest ? 'Loading older messages...' : 'Loading messages...', isOlderRequest ? 'Looking for earlier posts' : 'Connecting to space');
+  }
+
+  google.script.run.withSuccessHandler((payload) => {
+    if (roomId !== state.roomId) {
+      state.loadingMessages = false;
+      setChatLoading(false);
+      return;
+    }
+
+    const response = payload && Array.isArray(payload.messages) ? payload : {
+      messages: Array.isArray(payload) ? payload : [],
+      hasMoreOlder: false
+    };
+    const incoming = dedupeMessages(response.messages || []);
+
+    let mergedMessages = roomMessages;
+    if (isOlderRequest) {
+      mergedMessages = dedupeMessages([...incoming, ...roomMessages]);
+    } else if (isRefresh) {
+      mergedMessages = dedupeMessages([...roomMessages, ...incoming]);
+    } else {
+      mergedMessages = incoming;
+    }
+
+    state.roomMessages[roomKey] = mergedMessages;
+    const newest = getNewestCreatedAt(mergedMessages);
+    const oldest = getOldestCreatedAt(mergedMessages);
+    state.roomMeta[roomKey] = {
+      newestCreatedAt: newest,
+      oldestCreatedAt: oldest,
+      hasMoreOlder: !!response.hasMoreOlder
+    };
+
+    const preserveScrollPosition = isOlderRequest && currentChat;
+    renderMessagesForRoom(roomKey, mergedMessages, preserveScrollPosition);
+    if (preserveScrollPosition && currentChat) {
+      currentChat.scrollTop = scrollBeforeRequest + (currentChat.scrollHeight - scrollHeightBeforeRequest);
+    }
+
+    state.loadingMessages = false;
+    updateOlderButtonVisibility();
+    if (showLoading) {
+      setChatLoading(false);
+    }
+    scheduleNextMessagePoll();
+  }).withFailureHandler(() => {
+    if (roomId === state.roomId) {
+      state.loadingMessages = false;
+      if (showLoading) {
+        setChatLoading(false);
+      }
+    }
+  }).getMessages(roomId, beforeCreatedAt, limit, state.sessionToken, sinceCreatedAt);
+}
+
+$('#rooms').on('change', function() {
+  const previousRoomId = state.roomId;
+  state.roomId = $('#rooms').val();
+
+  if (previousRoomId !== state.roomId) {
+    $('#chat').empty();
+    if (state.roomId) {
+      state.roomMessages[String(state.roomId)] = [];
+      state.roomMeta[String(state.roomId)] = {};
+    }
+  }
+
+  updateRoomHeader();
+  stopMessagePolling();
+  if (state.roomId) {
+    requestMessages({ limit: state.pageSize, showLoading: true, isInitialLoad: true });
+  }
+});
+
+$('#loginForm').on('submit', function(event) {
+  event.preventDefault();
+  clearAuthErrors();
+
+  const username = $('#loginUser').val().trim();
+  const password = $('#loginPass').val();
+
+  if (!username || !password) {
+    $('#loginErr').text('Please enter a username and password.');
+    return;
+  }
+
+  const $button = $('#loginForm button[type="submit"]');
+  $button.addClass('is-loading');
+  $button.html('<span class="loading-spinner"></span>Logging in');
+
+  google.script.run.withSuccessHandler((result) => {
+    if (!result || !result.ok) {
+      $button.removeClass('is-loading');
+      $button.html('Login');
+      $('#loginErr').text('Invalid username or password.');
+      return;
+    }
+
+    state.username = result.username;
+    state.sessionToken = result.token;
+    localStorage.setItem('chatSessionToken', result.token);
+    showApp();
+  }).login(username, password);
+});
+
+$('#signupForm').on('submit', function(event) {
+  event.preventDefault();
+  clearAuthErrors();
+
+  const username = $('#signupUser').val().trim();
+  const password = $('#signupPass').val();
+  const passwordConfirm = $('#signupPassConfirm').val();
+
+  if (!username || !password || !passwordConfirm) {
+    $('#signupErr').text('Please complete every field.');
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    $('#signupErr').text('Passwords do not match.');
+    return;
+  }
+
+  const $button = $('#signupForm button[type="submit"]');
+  $button.addClass('is-loading');
+  $button.html('<span class="loading-spinner"></span>Creating');
+
+  google.script.run.withSuccessHandler((result) => {
+    if (!result || !result.ok) {
+      $button.removeClass('is-loading');
+      $button.html('Create account');
+      $('#signupErr').text(result && result.error ? result.error : 'Unable to create account.');
+      return;
+    }
+
+    $button.removeClass('is-loading');
+    $button.html('Create account');
+    $('#signupForm')[0].reset();
+    $('#signupSuccess').text('Account created successfully. You can now log in.');
+  }).registerAccount(username, password);
+});
+
+$('#input').on('submit', function(event) {
+  event.preventDefault();
+  if (!state.roomId || !state.sessionToken) return;
+
+  const text = $('#text').val().trim();
+  if (!text && !state.pendingImage) return;
+
+  if (state.pendingImage && state.pendingImage.length > 50000) {
+    $('#text').attr('placeholder', 'Image is too large. Keep it under 50,000 characters.');
+    return;
+  }
+
+  setSubmitLoading(true);
+
+  google.script.run.withSuccessHandler((savedMessage) => {
+    if (savedMessage && savedMessage.id) {
+      appendMessage(savedMessage, state.roomId);
+    }
+
+    $('#text').val('');
+    state.pendingImage = '';
+    $('#imageUpload').val('');
+    $('#text').attr('placeholder', 'Message...');
+    setSubmitLoading(false);
+  }).saveMessage(state.roomId, text, state.pendingImage, state.sessionToken);
+
+  google.script.run.withFailureHandler(() => {
+    setSubmitLoading(false);
+    $('#text').attr('placeholder', 'Message failed to send.');
+  });
+});
+
+$('#imageUpload').on('change', function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) {
+    state.pendingImage = '';
+    return;
+  }
+
+  if (file.size > 1000000) {
+    $('#text').attr('placeholder', 'Image too large. Please choose a smaller image.');
+    $('#imageUpload').val('');
+    state.pendingImage = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function() {
+    const dataUrl = reader.result || '';
+    const imageDataMatch = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+    const base64Payload = imageDataMatch ? imageDataMatch[2] : '';
+
+    if (!base64Payload || base64Payload.length > 50000) {
+      $('#text').attr('placeholder', 'Image exceeds the 50,000-character limit.');
+      $('#imageUpload').val('');
+      state.pendingImage = '';
+      return;
+    }
+
+    state.pendingImage = base64Payload;
+    $('#text').attr('placeholder', 'Image ready to send');
+  };
+  reader.readAsDataURL(file);
+});
+
+$('#newRoom').on('click', function() {
+  const roomName = prompt('Public room name?');
+  if (!roomName) return;
+  google.script.run.withSuccessHandler(() => loadRooms()).createRoom(roomName, false, [], state.sessionToken);
+});
+
+$('#newPrivateRoom').on('click', function() {
+  const roomName = prompt('Private room name?');
+  if (!roomName) return;
+  const inviteListText = prompt('Invite users (comma separated):', '');
+  const inviteList = inviteListText ? inviteListText.split(',').map(name => name.trim()).filter(Boolean) : [];
+  google.script.run.withSuccessHandler(() => loadRooms()).createRoom(roomName, true, inviteList, state.sessionToken);
+});
+
+$('#newDM').on('click', function() {
+  const targetUser = prompt('Direct message username?');
+  if (!targetUser) return;
+
+  google.script.run.withSuccessHandler((room) => {
+    if (!room) return;
+    state.roomId = room.id;
+    loadRooms();
+  }).getOrCreateDirectRoom(targetUser, state.sessionToken);
+});
+
+$('#invite').on('click', function() {
+  if (!state.roomId) return;
+  const inviteUser = prompt('Invite a user to this room:');
+  if (!inviteUser) return;
+  google.script.run.withSuccessHandler(() => loadRooms()).inviteUser(state.roomId, inviteUser, state.sessionToken);
+});
+
+$('#toggleSettings').on('click', function() {
+  toggleSettingsPanel();
+});
+
+$('#closeSettings, #cancelSettings').on('click', function() {
+  toggleSettingsPanel(false);
+});
+
+$('#saveSettings').on('click', function() {
+  saveUserVisibility();
+});
+
+$('#refreshMessages').on('click', function() {
+  if (state.roomId && state.sessionToken) {
+    const roomKey = String(state.roomId);
+    const newestCreatedAt = getNewestCreatedAt(state.roomMessages[roomKey] || []);
+    requestMessages({
+      sinceCreatedAt: newestCreatedAt,
+      limit: 200,
+      showLoading: false,
+      isRefresh: true
+    });
+  }
+});
+
+$('#loadOlderButton').on('click', function() {
+  const roomKey = state.roomId ? String(state.roomId) : '';
+  if (!roomKey || state.loadingMessages) return;
+
+  const oldestCreatedAt = getOldestCreatedAt(state.roomMessages[roomKey] || []);
+  if (!oldestCreatedAt) return;
+
+  requestMessages({
+    beforeCreatedAt: oldestCreatedAt,
+    limit: state.pageSize,
+    showLoading: true,
+    isOlderRequest: true
+  });
+});
+
+$('#chat').on('scroll', function() {
+  const roomId = state.roomId;
+  if (!roomId) return;
+
+  const shouldShowOlder = $(this).scrollTop() <= 80 && !!(state.roomMeta[String(roomId)] || {}).hasMoreOlder;
+  $('#loadOlderButton').toggleClass('hidden', !shouldShowOlder || state.loadingMessages);
+});
+
+$('#deleteRoom').on('click', function() {
+  if (!state.roomId) return;
+  google.script.run.withSuccessHandler((result) => {
+    if (!result || !result.ok) {
+      return;
+    }
+
+    stopMessagePolling();
+    state.roomId = null;
+    loadRooms();
+    $('#chat').empty();
+    state.roomMessages = {};
+    state.roomMeta = {};
+    updateRoomHeader();
+  }).deleteRoom(state.roomId, state.sessionToken);
+});
+
+$('.themeBtn').on('click', function() {
+  applyTheme($(this).data('theme'));
+});
+
+$('#logout').on('click', function() {
+  if (state.sessionToken) {
+    google.script.run.logout(state.sessionToken);
+  }
+  clearSessionState();
+  $('#loginForm')[0].reset();
+  $('#signupForm')[0].reset();
+  clearAuthErrors();
+  showLogin();
+});
+
+function validateExistingSession() {
+  if (!state.sessionToken) {
+    showLogin();
+    return;
+  }
+
+  google.script.run.withSuccessHandler((result) => {
+    if (!result || !result.ok) {
+      clearSessionState();
+      showLogin();
+      return;
+    }
+
+    state.username = result.username;
+    showApp();
+  }).validateSession(state.sessionToken);
+}
+
+function init() {
+  if (!state.sessionToken) {
+    showLogin();
+    return;
+  }
+
+  applyTheme(state.theme);
+  loadRooms();
+  loadUsers();
+  loadUserVisibility();
+}
+
+if (state.sessionToken) {
+  validateExistingSession();
+} else {
+  applyTheme(state.theme);
+  showLogin();
+}
+</script>
+
+</body>
+</html>
